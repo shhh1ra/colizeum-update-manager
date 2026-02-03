@@ -10,9 +10,10 @@ namespace colizeumUpdateManager.Data
             get
             {
                 // 1) ENV (удобно для docker / сервера)
-                var env = Environment.GetEnvironmentVariable("COLIZEUM_DB");
-                if (!string.IsNullOrWhiteSpace(env))
-                    return env;
+                //var env = Environment.GetEnvironmentVariable("COLIZEUM_DB");
+                //if (!string.IsNullOrWhiteSpace(env))
+                //    return env;
+                // I'll think about safe remove this component
 
                 // 2) App.config / exe.config (удобно для “поменять без сборки”)
                 var cs = ConfigurationManager.ConnectionStrings["MainDb"]?.ConnectionString;
@@ -24,4 +25,5 @@ namespace colizeumUpdateManager.Data
             }
         }
     }
+
 }
