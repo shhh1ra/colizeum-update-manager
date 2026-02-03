@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<connectionStrings>
+		<add name="MainDb"
+			 connectionString="Host=<server-ip>;Port=<server-port (5432 usually>;Database=<name>;Username=<login-cred>;Password=<passwd-cred>"
+			 providerName="Npgsql" />
+	</connectionStrings>
+</configuration>
