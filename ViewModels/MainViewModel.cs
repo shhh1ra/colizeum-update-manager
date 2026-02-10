@@ -1,121 +1,76 @@
-﻿using colizeumUpdateManager.Data;
-using colizeumUpdateManager.Models;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿using System.Threading.Tasks;
 using System.Windows.Input;
+using colizeumUpdateManager.Infrastructure;
 
 namespace colizeumUpdateManager.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public class MainViewModel : ViewModelBase
     {
-        private readonly GameRepository _repo = new();
-
-        public ObservableCollection<Pc> Pcs { get; } = new();
-        public ObservableCollection<PcGame> Games { get; } = new();
-
-        private Pc _selectedPc;
-        public Pc SelectedPc
+        private object? _currentViewModel;
+        public object? CurrentViewModel
         {
-            get => _selectedPc;
+            get => _currentViewModel;
+            set { _currentViewModel = value; OnPropertyChanged(); }
+        }
+
+        private AppSection _currentSection;
+        public AppSection CurrentSection
+        {
+            get => _currentSection;
             set
             {
-                _selectedPc = value;
+                _currentSection = value;
                 OnPropertyChanged();
-                LoadGamesForDate(SelectedDate);
+                OnPropertyChanged(nameof(IsGamesActive));
+                OnPropertyChanged(nameof(IsTimersActive));
             }
         }
 
-        private DateTime _selectedDate = DateTime.Today;
-        public DateTime SelectedDate
-        {
-            get => _selectedDate;
-            set
-            {
-                _selectedDate = value.Date;
-                OnPropertyChanged();
-                LoadGamesForDate(_selectedDate);
-            }
-        }
+        public bool IsGamesActive => CurrentSection == AppSection.Games;
+        public bool IsTimersActive => CurrentSection == AppSection.Timers;
 
-        public ICommand SaveCommand { get; }
+        public ICommand ShowGamesCommand { get; }
+        public ICommand ShowTimersCommand { get; }
+
+        // держим инстанс таймеров, чтобы сохранить на выходе даже если пользователь не на этом экране
+        public TimersViewModel TimersVm { get; } = new TimersViewModel();
+        private bool _timersLoaded;
 
         public MainViewModel()
         {
-            SaveCommand = new RelayCommand(async () => await SaveAllGames());
+            ShowGamesCommand = new RelayCommand(async _ => await ShowGames());
+            ShowTimersCommand = new RelayCommand(async _ => await ShowTimers());
+
+            _ = ShowGames();
         }
 
-        public async void Load()
+        private async Task ShowGames()
         {
-            var pcs = await _repo.GetPcs();
-            Pcs.Clear();
-            foreach (var pc in pcs)
-                Pcs.Add(pc);
+            CurrentSection = AppSection.Games;
 
-            if (Pcs.Any())
-                SelectedPc = Pcs.First();
+            var vm = new GamesViewModel();
+            CurrentViewModel = vm;
+            await vm.Load();
         }
 
-        private async void LoadGamesForDate(DateTime date)
+        private async Task ShowTimers()
         {
-            Games.Clear();
-            if (SelectedPc == null) return;
+            CurrentSection = AppSection.Timers;
 
-            await EnsureStatusesForDate(SelectedPc.Id, date);
-
-            var games = await _repo.GetGamesForPc(SelectedPc.Id, date);
-            foreach (var g in games)
-                Games.Add(g);
-        }
-
-        // Вставляем нулевые записи на дату, если для этой даты у ПК вообще нет статусов
-        private async Task EnsureStatusesForDate(int pcId, DateTime date)
-        {
-            var hasAny = await _repo.HasAnyStatusForDate(pcId, date);
-            if (hasAny) return;
-
-            var requiredGameIds = await _repo.GetRequiredGameIdsForPc(pcId);
-            foreach (var gameId in requiredGameIds)
+            if (!_timersLoaded)
             {
-                await _repo.SaveStatus(pcId, gameId, UpdateStatus.NotUpdated, date);
+                await TimersVm.Load();
+                _timersLoaded = true;
             }
+
+            CurrentViewModel = TimersVm;
         }
 
-        private async Task SaveAllGames()
+        // вызывать при закрытии приложения
+        public async Task FlushOnExit()
         {
-            if (SelectedPc == null) return;
-
-            foreach (var game in Games)
-            {
-                await _repo.SaveStatus(game.PcId, game.GameId, game.Status, SelectedDate);
-            }
+            if (_timersLoaded)
+                await TimersVm.OnAppClosing();
         }
-
-        public async Task SaveGameStatus(PcGame game)
-        {
-            await _repo.SaveStatus(game.PcId, game.GameId, game.Status, SelectedDate);
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    }
-
-    public class RelayCommand : ICommand
-    {
-        private readonly Func<Task> _execute;
-        private readonly Func<bool> _canExecute;
-
-        public RelayCommand(Func<Task> execute, Func<bool> canExecute = null)
-        {
-            _execute = execute;
-            _canExecute = canExecute;
-        }
-
-        public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
-        public async void Execute(object parameter) => await _execute();
-
-        public event EventHandler CanExecuteChanged;
-        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 }

@@ -35,25 +35,25 @@ public class GameRepository
         var yesterday = actualDate.AddDays(-1);
 
         const string sql = """
-SELECT 
-    g.id,
-    g.name,
-    COALESCE(s_today.status, 0) AS status_today,
-    COALESCE(s_yest.status, 0)  AS status_yest
-FROM pc_required_games prg
-JOIN games g 
-    ON g.id = prg.game_id
-LEFT JOIN pc_game_status s_today
-    ON s_today.pc_id = prg.pc_id
-   AND s_today.game_id = prg.game_id
-   AND s_today.status_date = @date
-LEFT JOIN pc_game_status s_yest
-    ON s_yest.pc_id = prg.pc_id
-   AND s_yest.game_id = prg.game_id
-   AND s_yest.status_date = @yest
-WHERE prg.pc_id = @pc
-ORDER BY g.name
-""";
+            SELECT 
+                g.id,
+                g.name,
+                COALESCE(s_today.status, 0) AS status_today,
+                COALESCE(s_yest.status, 0)  AS status_yest
+            FROM pc_required_games prg
+            JOIN games g 
+                    ON g.id = prg.game_id
+            LEFT JOIN pc_game_status s_today
+                    ON s_today.pc_id = prg.pc_id
+                AND s_today.game_id = prg.game_id
+                AND s_today.status_date = @date
+            LEFT JOIN pc_game_status s_yest
+                    ON s_yest.pc_id = prg.pc_id
+                AND s_yest.game_id = prg.game_id
+                AND s_yest.status_date = @yest
+            WHERE prg.pc_id = @pc
+            ORDER BY g.name
+            """;
 
         await using var conn = new NpgsqlConnection(DbConfig.ConnectionString);
         await conn.OpenAsync();
@@ -82,12 +82,12 @@ ORDER BY g.name
     public async Task<bool> HasAnyStatusForDate(int pcId, DateTime date)
     {
         const string sql = """
-SELECT EXISTS (
-    SELECT 1
-    FROM pc_game_status
-    WHERE pc_id = @pc AND status_date = @date
-)
-""";
+            SELECT EXISTS (
+            SELECT 1
+            FROM pc_game_status
+            WHERE pc_id = @pc AND status_date = @date
+            )
+            """;
 
         await using var conn = new NpgsqlConnection(DbConfig.ConnectionString);
         await conn.OpenAsync();
@@ -105,10 +105,10 @@ SELECT EXISTS (
         var list = new List<int>();
 
         const string sql = """
-SELECT game_id
-FROM pc_required_games
-WHERE pc_id = @pc
-""";
+            SELECT game_id
+            FROM pc_required_games
+            WHERE pc_id = @pc
+            """;
 
         await using var conn = new NpgsqlConnection(DbConfig.ConnectionString);
         await conn.OpenAsync();
@@ -131,11 +131,11 @@ WHERE pc_id = @pc
         var actualDate = (date ?? DateTime.Today).Date;
 
         var cmd = new NpgsqlCommand(@"
-INSERT INTO pc_game_status (pc_id, game_id, status, status_date)
-VALUES (@pc, @game, @st, @date)
-ON CONFLICT (pc_id, game_id, status_date)
-DO UPDATE SET status = @st
-", conn);
+            INSERT INTO pc_game_status (pc_id, game_id, status, status_date)
+            VALUES (@pc, @game, @st, @date)
+            ON CONFLICT (pc_id, game_id, status_date)
+            DO UPDATE SET status = @st
+            ", conn);
 
         cmd.Parameters.AddWithValue("pc", pcId);
         cmd.Parameters.AddWithValue("game", gameId);

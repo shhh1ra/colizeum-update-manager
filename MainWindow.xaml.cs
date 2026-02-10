@@ -1,25 +1,47 @@
-﻿using System;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Controls;
-using colizeumUpdateManager.Models;
 using colizeumUpdateManager.ViewModels;
 
 namespace colizeumUpdateManager
 {
     public partial class MainWindow : Window
     {
+        private bool _isExiting;
+
         public MainWindow()
         {
             InitializeComponent();
-            var vm = new MainViewModel();
-            DataContext = vm;
-            Loaded += (_, __) => vm.Load();
+            DataContext = new MainViewModel();
+            Closing += MainWindow_Closing;
         }
 
-        // Drag window
+        private async void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (_isExiting) return;
+
+            // Отменяем закрытие, чтобы успеть сохранить
+            e.Cancel = true;
+            _isExiting = true;
+
+            try
+            {
+                if (DataContext is MainViewModel vm)
+                    await vm.FlushOnExit();
+            }
+            finally
+            {
+                // Закрываем окно повторно уже “по-настоящему”
+                Closing -= MainWindow_Closing;
+                Close();
+            }
+        }
+
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ButtonState != MouseButtonState.Pressed)
+                return;
+
             if (e.ClickCount == 2)
             {
                 ToggleMaximize();
@@ -43,14 +65,6 @@ namespace colizeumUpdateManager
             WindowState = WindowState == WindowState.Maximized
                 ? WindowState.Normal
                 : WindowState.Maximized;
-        }
-
-        private async void DataGrid_RowEditEnding(object sender, DataGridRowEditEndingEventArgs e)
-        {
-            if (DataContext is MainViewModel vm && e.Row.Item is PcGame game)
-            {
-                await vm.SaveGameStatus(game);
-            }
         }
     }
 }
